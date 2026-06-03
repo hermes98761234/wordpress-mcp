@@ -46,13 +46,22 @@ class WMCP_Server {
             );
         }
 
-        $tool  = isset( $body['tool'] ) ? sanitize_text_field( $body['tool'] ) : '';
-        $params = isset( $body['params'] ) && is_array( $body['params'] ) ? $body['params'] : array();
+        $tool    = isset( $body['tool'] ) ? sanitize_text_field( $body['tool'] ) : '';
+        $action  = isset( $body['action'] ) ? sanitize_text_field( $body['action'] ) : '';
+        $params  = isset( $body['params'] ) && is_array( $body['params'] ) ? $body['params'] : array();
 
         if ( empty( $tool ) ) {
             return new WP_Error(
                 'wmcp_missing_tool',
                 '"tool" field is required.',
+                array( 'status' => 400 )
+            );
+        }
+
+        if ( empty( $action ) ) {
+            return new WP_Error(
+                'wmcp_missing_action',
+                '"action" field is required.',
                 array( 'status' => 400 )
             );
         }
@@ -93,7 +102,7 @@ class WMCP_Server {
             );
         }
 
-        $result = call_user_func( array( $class_name, 'execute' ), $params );
+        $result = call_user_func( array( $class_name, 'execute' ), $action, $params );
 
         if ( is_wp_error( $result ) ) {
             return $result;
