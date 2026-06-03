@@ -105,9 +105,46 @@ class WMCP_Server {
         $result = call_user_func( array( $class_name, 'execute' ), $action, $params );
 
         if ( is_wp_error( $result ) ) {
-            return $result;
+            return new WP_REST_Response( array(
+                'success' => false,
+                'error'   => $result->get_error_message(),
+                'code'    => $result->get_error_code(),
+            ), (int) $result->get_error_data( 'status' ) ?: 400 );
         }
 
-        return new WP_REST_Response( array( 'result' => $result ), 200 );
+        return new WP_REST_Response( array(
+            'success' => true,
+            'data'    => $result,
+        ), 200 );
+    }
+
+    /**
+     * Get a list of all available tools and their actions.
+     *
+     * @return array
+     */
+    public static function get_available_tools(): array {
+        $tools = array(
+            'posts'     => array( 'list_posts', 'get_post', 'create_post', 'update_post', 'delete_post', 'list_post_types' ),
+            'pages'     => array( 'list_pages', 'get_page', 'create_page', 'update_page', 'delete_page' ),
+            'users'     => array( 'list_users', 'get_user', 'create_user', 'update_user', 'delete_user' ),
+            'media'     => array( 'list_media', 'get_media', 'upload_media', 'update_media', 'delete_media' ),
+            'settings'  => array( 'get_settings', 'update_settings' ),
+            'plugins'   => array( 'list_plugins', 'activate_plugin', 'deactivate_plugin', 'update_plugin' ),
+            'themes'    => array( 'list_themes', 'activate_theme', 'delete_theme' ),
+            'comments'  => array( 'list_comments', 'get_comment', 'create_comment', 'update_comment', 'delete_comment', 'approve_comment', 'spam_comment' ),
+            'taxonomies'=> array( 'list_taxonomies', 'list_terms', 'get_term', 'create_term', 'update_term', 'delete_term' ),
+            'menus'     => array( 'list_menus', 'get_menu', 'create_menu', 'update_menu', 'delete_menu', 'add_menu_item' ),
+        );
+
+        if ( class_exists( 'WooCommerce' ) ) {
+            $tools['woocommerce'] = array(
+                'list_products', 'get_product', 'update_product',
+                'list_orders', 'get_order', 'update_order_status',
+                'list_customers',
+            );
+        }
+
+        return $tools;
     }
 }

@@ -29,6 +29,17 @@ add_action( 'rest_api_init', function () {
         'callback'            => array( WMCP_Server::class, 'handle_request' ),
         'permission_callback' => '__return_true',
     ) );
+
+    register_rest_route( 'mcp/v1', '/tools', array(
+        'methods'             => 'GET',
+        'callback'            => function() {
+            return new WP_REST_Response( array(
+                'success' => true,
+                'data'    => WMCP_Server::get_available_tools(),
+            ), 200 );
+        },
+        'permission_callback' => '__return_true',
+    ) );
 } );
 
 add_action( 'admin_menu', function () {
@@ -45,32 +56,68 @@ function wmcp_render_settings_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
-    $api_key = get_option( 'wmcp_api_key' );
+
+    // Handle regenerate key action.
+    if ( isset( $_POST['wmcp_regenerate_key'] ) && check_admin_referer( 'wmcp_regenerate_key_action', 'wmcp_regenerate_key_nonce' ) ) {
+        $new_key = WMCP_Auth::generate_key();
+        echo '<div class="notice notice-success is-dismissible"><p>API key regenerated successfully.</p></div>';
+    }
+
+    $api_key     = get_option( 'wmcp_api_key' );
+    $masked_key  = $api_key ? substr( $api_key, 0, 8 ) . '...' : 'Not set';
+    $tools       = WMCP_Server::get_available_tools();
+    $endpoint    = site_url( '/wp-json/mcp/v1/execute' );
     ?>
     <div class="wrap">
         <h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-        <form method="post" action="options.php">
-            <?php settings_fields( 'wmcp_settings_group' ); ?>
+
+        <h2>API Key</h2>
+        <form method="post">
+            <?php wp_nonce_field( 'wmcp_regenerate_key_action', 'wmcp_regenerate_key_nonce' ); ?>
             <table class="form-table">
                 <tr>
-                    <th scope="row"><label for="wmcp_api_key">API Key</label></th>
+                    <th scope="row"><label>Current API Key</label></th>
                     <td>
-                        <input type="text" id="wmcp_api_key" name="wmcp_api_key"
-                               value="<?php echo esc_attr( $api_key ); ?>"
-                               class="regular-text" readonly />
-                        <p class="description">Use this key in the Authorization header as: Bearer &lt;key&gt;</p>
+                        <code><?php echo esc_html( $masked_key ); ?></code>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="wmcp_full_key">Full Key</label></th>
+                    <td>
+                        <textarea id="wmcp_full_key" class="large-text" rows="2" readonly onclick="this.select()"><?php echo esc_textarea( $api_key ); ?></textarea>
+                        <p class="description">Click the textarea above to select all, then copy. Use in the Authorization header as: <code>Bearer &lt;key&gt;</code></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label>Endpoint URL</label></th>
+                    <td>
+                        <code><?php echo esc_html( $endpoint ); ?></code>
                     </td>
                 </tr>
             </table>
-            <?php submit_button(); ?>
+            <?php submit_button( 'Regenerate API Key', 'secondary', 'wmcp_regenerate_key' ); ?>
         </form>
+
+        <h2>Available MCP Tools</h2>
+        <table class="widefat striped">
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $tools as $tool_name => $actions ) : ?>
+                <tr>
+                    <td><strong><?php echo esc_html( $tool_name ); ?></strong></td>
+                    <td><code><?php echo esc_html( implode( ', ', $actions ) ); ?></code></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
     <?php
 }
-
-add_action( 'admin_init', function () {
-    register_setting( 'wmcp_settings_group', 'wmcp_api_key' );
-} );
 
 register_activation_hook( __FILE__, function () {
     if ( ! get_option( 'wmcp_api_key' ) ) {
